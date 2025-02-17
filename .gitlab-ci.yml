@@ -3,9 +3,17 @@ services:
   - docker:dind
 
 stages:
+  - test
   - build
   - package
   - deploy
+
+
+job_name:
+  stage: test
+  script:
+    - curl -fsSL https://app.testcontainers.cloud/bash | bash
+    - "mvn clean test"
 
 maven-build:
   image: maven:3-eclipse-temurin-23-alpine
