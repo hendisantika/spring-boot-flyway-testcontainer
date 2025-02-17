@@ -1,4 +1,4 @@
-image: eclipse-temurin:23-jdk
+image: docker:23.0.1
 
 services:
   - docker:20.10.16-dind
