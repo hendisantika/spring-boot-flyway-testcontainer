@@ -2,7 +2,6 @@ image: docker:23.0.1
 
 services:
   - docker:20.10.16-dind
-  - 3.9.9-eclipse-temurin-23-alpine
 
 variables:
   DOCKER_DRIVER: overlay2
@@ -35,7 +34,7 @@ before_script:
   - echo "MAVEN_OPTS=$MAVEN_OPTS"
 
 test_containers:
-  #  image: 3.9.9-eclipse-temurin-23-alpine
+  image: eclipse-temurin:23-jdk
   stage: test
   script:
     - apt-get update && apt-get install -y curl bash
