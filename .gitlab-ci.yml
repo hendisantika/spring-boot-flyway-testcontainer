@@ -28,6 +28,7 @@ before_script:
 test_containers:
   stage: test
   script:
+    - apt-get update && apt-get install -y curl bash
     - curl -fsSL https://app.testcontainers.cloud/bash | bash
     - "mvn clean test"
   only:
