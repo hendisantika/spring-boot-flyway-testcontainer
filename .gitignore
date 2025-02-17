@@ -18,6 +18,7 @@ logs
 *.iws
 *.iml
 *.ipr
+pgadmin
 
 ### NetBeans ###
 /nbproject/private/
