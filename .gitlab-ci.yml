@@ -37,7 +37,6 @@ test_containers:
   image: eclipse-temurin:23-jdk
   stage: test
   script:
-    - apk add --no-cache curl bash
     - apt-get update && apt-get install -y curl bash
     - curl -fsSL https://app.testcontainers.cloud/bash | bash
     - "mvn clean test"
