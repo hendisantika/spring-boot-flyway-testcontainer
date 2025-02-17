@@ -5,8 +5,17 @@ services:
 
 variables:
   DOCKER_DRIVER: overlay2
-  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --errors --fail-at-end --show-version"
-  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  MAVEN_OPTS: >-
+    -Dhttps.protocols=TLSv1.2
+    -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository
+    -Dorg.slf4j.simpleLogger.showDateTime=true
+    -Djava.awt.headless=true
+  MAVEN_CLI_OPTS: >-
+    --batch-mode
+    --errors
+    --fail-at-end
+    --show-version
+    --no-transfer-progress
 
 stages:
   - test
@@ -25,9 +34,12 @@ before_script:
   - echo "MAVEN_OPTS=$MAVEN_OPTS"
   - docker info
 
+
 test_containers:
+  image: eclipse-temurin:23-jdk
   stage: test
   script:
+    - apk add --no-cache curl bash
     - apt-get update && apt-get install -y curl bash
     - curl -fsSL https://app.testcontainers.cloud/bash | bash
     - "mvn clean test"
