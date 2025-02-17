@@ -17,6 +17,15 @@ variables:
     --fail-at-end
     --show-version
     --no-transfer-progress
+  # Instruct Testcontainers to use the daemon of DinD.
+  DOCKER_HOST: "tcp://docker:2375"
+  #  DOCKER_HOST: "tcp://127.0.0.1:39751"
+  # Instruct Docker not to start over TLS.
+  DOCKER_TLS_CERTDIR: ""
+  # Improve performance with overlayfs.
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+
+
 
 stages:
   - test
