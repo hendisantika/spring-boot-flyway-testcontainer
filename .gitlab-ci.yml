@@ -34,7 +34,7 @@ before_script:
   - echo "MAVEN_OPTS=$MAVEN_OPTS"
 
 test_containers:
-  image: eclipse-temurin:23-jdk
+  image: 3.9.9-eclipse-temurin-23-alpine
   stage: test
   script:
     - apt-get update && apt-get install -y curl bash
