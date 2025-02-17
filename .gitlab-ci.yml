@@ -32,8 +32,6 @@ before_script:
   - apt-get update && apt-get install -y curl bash
   - echo "MAVEN_CLI_OPTS=$MAVEN_CLI_OPTS"
   - echo "MAVEN_OPTS=$MAVEN_OPTS"
-  - docker info
-
 
 test_containers:
   image: eclipse-temurin:23-jdk
