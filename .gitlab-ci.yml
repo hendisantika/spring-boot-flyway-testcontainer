@@ -1,41 +1,114 @@
-image: eclipse-temurin:23-jdk
+image: docker:27.3.1-alpine3.20
 
 services:
-  - docker:20.10.16-dind
+  - docker:dind
 
 variables:
+  # Instruct Testcontainers to use the daemon of DinD.
+  DOCKER_HOST: "tcp://docker:2375"
+  # Instruct Docker not to start over TLS.
+  DOCKER_TLS_CERTDIR: ""
+  # Improve performance with overlays.
   DOCKER_DRIVER: overlay2
-  MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode --errors --fail-at-end --show-version"
-  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+  GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
 
 stages:
-  - build
   - test
-  - deploy
+  - build jar
+  - build prod jar
+  - build and push docker image
+  - deploy dev
 
-cache:
-  paths:
-    - .m2/repository
-    - target
-
-before_script:
-  - echo "MAVEN_CLI_OPTS=$MAVEN_CLI_OPTS"
-  - echo "MAVEN_OPTS=$MAVEN_OPTS"
-  - docker info
-
-build:
-  stage: build
-  script:
-    - mvn $MAVEN_CLI_OPTS clean compile
-
-test:
+test_job:
+  image: maven:3.9.9-eclipse-temurin-21
   stage: test
   script:
-    - mvn $MAVEN_CLI_OPTS test
+    - pwd
+    - mvn clean
+    - mvn compile
+    - mvn test
+  #tags:
+  #  - test
+  only:
+    - merge_requests
+    - main
 
-deploy:
-  stage: deploy
+sonarqube:
+  image: maven:3.9.9-eclipse-temurin-21
+  stage: sonarqube
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
   script:
-    - mvn $MAVEN_CLI_OPTS deploy
+    - mvn verify sonar:sonar -Dsonar.projectKey=kominfo-pemuda-persis_flyway
+  allow_failure: true
+  only:
+    - merge_requests
+    - main
+
+build:
+  image: maven:3.9.9-eclipse-temurin-21
+  stage: build jar
+  before_script:
+    - source .dev.env
+  script:
+    - mvn clean install -Dspring.profiles.active=$SPRING_ACTIVE_PROFILE -DskipTests && mvn package -B -e -Dspring.profiles.active=dev -DskipTests
+  artifacts:
+    paths:
+      - target/*.jar
+  only:
+    - main
+
+docker build:
+  image: docker:27.3.1-alpine3.20
+  stage: build and push docker image
+  services:
+    - docker:27-dind
+  before_script:
+    - echo "$env_gitlab" > .env_gitlab
+    - source .env_gitlab
+    - apk add --no-cache curl jq aws-cli
+  script:
+    # - $(aws ecr get-login --region ap-southeast-1)
+    - aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin $ECR_URL
+    - docker build -t $REPOSITORY_URL:$CI_PIPELINE_IID -f ./docker/Dockerfile .
+    - docker push $REPOSITORY_URL:$CI_PIPELINE_IID
+  only:
+    - main
+
+deploy dev:
+  image: ubuntu:latest
+  stage: deploy dev
+  before_script:
+    - echo "$ENV_GITLAB" > .env_gitlab
+    - source .env_gitlab
+    - echo "$ENV_DEV" > .env
+    - echo REPOSITORY_ECR_URL=$REPOSITORY_ECR_URL >> .env
+    - echo TAG_NUMBER=$CI_PIPELINE_IID >> .env
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y && apt-get -y install rsync)'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY_DEV" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - ssh $USER_DEV@$SERVER_DEV "[ -d ~/anggota-service ] || mkdir ~/anggota-service"
+    - rsync -avuz $CI_PROJECT_DIR/.env $USER_DEV@$SERVER_DEV:~/anggota-service/.env
+    - rsync -avuz $CI_PROJECT_DIR/docker/docker-compose-dev.yml $USER_DEV@$SERVER_DEV:~/anggota-service/docker-compose.yml
+  #    - chmod +x $CI_PROJECT_DIR/init-dev.sh
+  #    - $CI_PROJECT_DIR/init-dev.sh
+  #    - rsync -avuz $CI_PROJECT_DIR/.dev.env $USER_DEV@$SERVER_DEV:~/.dev.env
+  #    - rsync -avuz $CI_PROJECT_DIR/init.sh $USER_DEV@$SERVER_DEV:~/anggota-service/init.sh
+  #    - rsync -avuz $CI_PROJECT_DIR/docker/docker-compose-dev.yml $USER_DEV@$SERVER_DEV:~/anggota-service/docker-compose.yml
+  script:
+    - pwd
+    - ssh $USER_DEV@$SERVER_DEV "eval aws ecr get-login-password --region ap-southeast-1 | docker login --username $ECR_USERNAME --password-stdin $ECR_URL; cd anggota-service; docker compose --env-file .env -f docker-compose.yml down; docker system prune -af; docker pull $REPOSITORY_ECR_URL:$CI_PIPELINE_IID; docker compose --env-file .env -f docker-compose.yml up -d"
+    #    - ssh $USER_DEV@$SERVER_DEV "eval aws ecr get-login-password --region ap-southeast-1 | docker login --username $ECR_USERNAME --password-stdin $REPOSITORY_URL; cd anggota-service; source init.sh"
+    #- ssh $USER_DEV@$SERVER_DEV "eval aws ecr get-login-password --region ap-southeast-1 | docker login --username $ECR_USERNAME --password-stdin $REPOSITORY_URL; docker stop $APP_NAME; docker system prune -a -f; docker pull $REPOSITORY_URL:$CI_PIPELINE_IID; cd anggota-service; docker-compose -f docker-compose.yml up -d"
+  #    - ssh $USER_DEV@$SERVER_DEV "eval aws ecr get-login-password --region ap-southeast-1 | docker login --username $ECR_USERNAME --password-stdin $REPOSITORY_URL; docker stop $APP_NAME; docker system prune -a -f; docker pull $REPOSITORY_URL:$CI_PIPELINE_IID; docker container run -d --name $APP_NAME -p $PORT:8080 --env-file .dev.env -e SPRING_PROFILES_ACTIVE=$SPRING_ACTIVE_PROFILE $REPOSITORY_URL:$CI_PIPELINE_IID"
   only:
     - main
