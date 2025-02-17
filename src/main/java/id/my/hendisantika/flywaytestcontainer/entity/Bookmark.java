@@ -67,4 +67,8 @@ public class Bookmark {
 
     @Column(name = "updated_at")
     private Instant updatedAt;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
 }
