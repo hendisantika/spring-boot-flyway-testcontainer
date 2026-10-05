@@ -9,7 +9,7 @@ with **Docker Compose**, and verifies everything in tests using **Testcontainers
 |------------------|-----------------------------|
 | Java             | 25                          |
 | Spring Boot      | 4.1.1                       |
-| Maven            | 3.9.16 (via Maven Wrapper)  |
+| Maven            | 3.10.0 (via Maven Wrapper)  |
 | PostgreSQL       | 17.3 (`postgres:17.3-alpine3.21`) |
 | Flyway           | managed by Spring Boot      |
 | Testcontainers   | managed by Spring Boot      |
