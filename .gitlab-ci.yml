@@ -8,6 +8,6 @@ stages:
   - deploy
 
 maven-build:
-  image: maven:3-eclipse-temurin-23-alpine
+  image: maven:3-eclipse-temurin-25-alpine
   stage: build
   script: "mvn clean package"
