@@ -2,6 +2,12 @@ image: docker:27.3.1-alpine3.20
 services:
   - docker:dind
 
+variables:
+  # Let Testcontainers reach the docker:dind service
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
+  TESTCONTAINERS_HOST_OVERRIDE: "docker"
+
 stages:
   - build
   - package
